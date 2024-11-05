@@ -26,7 +26,7 @@ Where, w is a growth rate parameter and K is the carrying capacity of kelp on a 
 
 [Benefits:]{.underline}
 
--   Kelp sequesters carbon. The higher is the biomass of kelp, the more carbon it sequesters. In this location, each ton of kelp biomass sequesters s tons of carbon per year. (For example, if s = .3 and the farm has 2 tons of kelp biomass, then the farm sequesters .6 tons of carbon that year.)
+-   Kelp sequesters carbon. The higher the biomass of kelp, the more carbon it sequesters. In this location, each ton of kelp biomass sequesters s tons of carbon per year. (For example, if s = .3 and the farm has 2 tons of kelp biomass, then the farm sequesters .6 tons of carbon that year.)
 -   The kelp farmer can sell carbon credits for sequestered carbon at a price of p per ton.
 
 # Questions:
@@ -45,45 +45,72 @@ library(tidyverse)
 Write a program in R that simulates the biomass of kelp over time. Make a plot of biomass over time for 20 years.
 
 ```{r}
-#set parameters
-w <- 0.5      # growth rate parameter
-k <- 100      # carrying capacity, max each farm can sustain
-n_time <- 20  # time horizon for simulation
+# B(t+1) = B(t) + wB(t)(1 - B(t)/K)
+# Set parameters
+# b = biomass
+n_time <- 20
+w <- 0.5  # growth rate
+k <- 100  # carrying capacity
 
-#function to simulate biomass over time
-simulate_biomass <- function(initial_biomass, w, k, time_horizon) {
-  biomass <- numeric(time_horizon)  #create biomass vector to store kelp biomass values for each year
-  biomass[1] <- initial_biomass    #initial biomass of kelp; set to 1 ton
-  
-#run a for loop to simulate biomass over time
-#(start at n_time minus 1 bc biomass[t + 1] depends on the previous year’s biomass)
-  for (t in seq_len(time_horizon - 1)) { 
+# Define function for biomass growth
+simulate_biomass <- function(initial_biomass = 1, n_time, w, k) {
+  biomass <- numeric(n_time)
+  biomass[1] <- initial_biomass
+
+  # Run a for loop to simulate biomass for each year based on the biomass from the previous year
+  # Using n_time - 1 ensures that we can calculate up to the last element of the biomass vector without exceeding its bounds
+  for (t in seq_len(n_time - 1)) {
     biomass[t + 1] <- biomass[t] + w * biomass[t] * (1 - biomass[t] / k)
   }
-  
   return(biomass)
 }
 
-#run the function
-biomass_over_time <- simulate_biomass(initial_biomass = 1, w = w, k = k, time_horizon = n_time)
+# Run the function 
+biomass_over_time <- simulate_biomass(initial_biomass = 1, n_time = n_time, w = w, k = k)
 
-#create a df 
-biomass_data <- data.frame(
-  Year = 1:n_time,
-  Biomass = biomass_over_time)
+# Create a data frame
+biomass_df <- data.frame(
+  year = 1:n_time,
+  biomass = biomass_over_time
+)
 
-#plot biomass over time using ggplot2
-ggplot(biomass_data, aes(x = Year, y = Biomass)) +
-  geom_line(color = "dodgerblue")+   # Line for biomass
-  geom_point(color = "dodgerblue")+  # Points for each year
-  labs(x = "Time (years)", y = "Biomass (tons)", title = "Kelp Biomass Growth Over Time") +
+# Load ggplot2 library
+library(ggplot2)
+
+# Plot it
+ggplot(biomass_df, aes(x = year, y = biomass)) +
+  geom_point(color = "dodgerblue") +
+  geom_line(color = "dodgerblue") +
+  labs(x = "Time (years)",
+       y = "Biomass (tons)",
+       title = "Kelp Biomass Growth Over Time") +
   theme_minimal()
+
 ```
 
 
 ### b)
 
 In year t = 10 what is the biomass of kelp? How much carbon is sequestered that year? What is the value of carbon credits the kelp farmer can sell that year?
+
+```{r}
+#get biomass for year 10
+biomass_year_10 <- biomass_over_time[10]
+biomass_year_10
+
+#carbon sequestered = biomass * carbon sequestration rate (0.5)
+s <- 0.5
+carbon_sequestered_year_10 <- biomass_year_10 * s
+carbon_sequestered_year_10 #tons
+
+#value of carbon credits farmer can sell that year
+#carbon credits = carbon sequestered * price per ton of carbon
+price_per_ton_year_10 <- 40 #USD
+value_carbon_credit_year_10 <- carbon_sequestered_year_10 * price_per_ton_year_10 
+value_carbon_credit_year_10
+
+```
+
 
 ### c)
 
