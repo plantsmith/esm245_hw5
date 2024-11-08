@@ -7,7 +7,9 @@ editor: visual
 
 # Introduction:
 
-Carbon sequestration on natural and working lands (NWL) has great poten- tial, but most carbon markets exclude NWL. In this homework you will do a cost benefit analysis of kelp farming to sequester carbon for a carbon market. Because this is a relatively new industry, you will conduct the analysis under uncertainty. Kelp farming is common in many parts of Asia and you will analyze the costs and benefits of a kelp farm to sequester carbon for the emerging Chinese carbon market. Consider a 1 hectare kelp farm, which has the following attributes (all monetary units are dollars):
+Carbon sequestration on natural and working lands (NWL) has great potential, but most carbon markets exclude NWL. In this homework you will do a cost benefit analysis of kelp farming to sequester carbon for a carbon market. Because this is a relatively new industry, you will conduct the analysis under uncertainty. 
+
+Kelp farming is common in many parts of Asia and you will analyze the costs and benefits of a kelp farm to sequester carbon for the emerging Chinese carbon market. Consider a 1 hectare kelp farm, which has the following attributes (all monetary units are dollars):
 
 [Costs:]{.underline}
 
@@ -33,6 +35,7 @@ Where, w is a growth rate parameter and K is the carrying capacity of kelp on a 
 ```{r}
 library(here)
 library(tidyverse)
+library(ggplot2)
 ```
 
 
@@ -45,13 +48,23 @@ library(tidyverse)
 Write a program in R that simulates the biomass of kelp over time. Make a plot of biomass over time for 20 years.
 
 ```{r}
-# B(t+1) = B(t) + wB(t)(1 - B(t)/K)
-# Set parameters
-# b = biomass
-n_time <- 20
-w <- 0.5  # growth rate
-k <- 100  # carrying capacity
+#parameters
+# Parameters
+c <- 10000  # setup cost
+d <- 1000    # maintenance cost
+w <- 0.5     # growth rate
+k <- 100     # carrying capacity
+s <- 0.5     # carbon sequestration rate
+p <- 40      # price per ton of carbon
+r <- 0.05    # discount rate
+n_time <- 20 # number of years
+```
 
+
+```{r}
+# B(t+1) = B(t) + wB(t)(1 - B(t)/K)
+
+# Scenario 1: 20-year horizon
 # Define function for biomass growth
 simulate_biomass <- function(initial_biomass = 1, n_time, w, k) {
   biomass <- numeric(n_time)
@@ -73,9 +86,6 @@ biomass_df <- data.frame(
   year = 1:n_time,
   biomass = biomass_over_time
 )
-
-# Load ggplot2 library
-library(ggplot2)
 
 # Plot it
 ggplot(biomass_df, aes(x = year, y = biomass)) +
@@ -99,14 +109,12 @@ biomass_year_10 <- biomass_over_time[10]
 biomass_year_10
 
 #carbon sequestered = biomass * carbon sequestration rate (0.5)
-s <- 0.5
 carbon_sequestered_year_10 <- biomass_year_10 * s
 carbon_sequestered_year_10 #tons
 
 #value of carbon credits farmer can sell that year
 #carbon credits = carbon sequestered * price per ton of carbon
-price_per_ton_year_10 <- 40 #USD
-value_carbon_credit_year_10 <- carbon_sequestered_year_10 * price_per_ton_year_10 
+value_carbon_credit_year_10 <- carbon_sequestered_year_10 * p
 value_carbon_credit_year_10
 
 ```
@@ -116,17 +124,163 @@ value_carbon_credit_year_10
 
 Plot the value of carbon credits sold against time.
 
+```{r}
+#plot the value of carbon credits sold against time
+carbon_credits_df <- biomass_df %>%
+  mutate(carbon_credit_value = biomass * s * p)
+
+# Plot value of carbon credits sold against time
+ggplot(carbon_credits_df, aes(x = year, y = carbon_credit_value)) +
+  geom_point(color = "sienna2") +
+  geom_line(color = "sienna2") +
+  labs(x = "Time (years)",
+       y = "Value of Carbon Credits Sold (USD)",
+       title = "Value of Carbon Credits Sold Over Time") +
+  theme_minimal()
+
+```
 ### d)
 
 Plot the present value of carbon credits sold against time.
 
-### e)
+```{r}
+# calculate value of carbon credits over time by discounting the value of carbon credits sold each year
 
+#formula: present value = future value / (1 + r)^year
+
+present_value_df <- carbon_credits_df %>%
+  mutate(present_value_carbon_credit = carbon_credit_value / (1 + r)^year)
+
+# Plot present value of carbon credits
+ggplot(present_value_df, aes(x = year, y = present_value_carbon_credit)) +
+  geom_point(color = "darkgreen") +
+  geom_line(color = "darkgreen") +
+  labs(x = "Time (years)",
+       y = "Present Value of Carbon Credits Sold (USD)",
+       title = "Present Value of Carbon Credits Sold Over Time") +
+  theme_minimal()
+
+```
+
+### e)
 Compare the sum of present value of costs against the sum of present value of benefits over a 50 year horizon. Do the benefits of the farm outweigh the costs?
+
+
+```{r}
+# Scenario 2: 50-year horizon
+
+# B(t+1) = B(t) + wB(t)(1 - B(t)/K)
+
+#simulate biomass growth over 50 years (hard code parameters)
+simulate_biomass_50_years <- function(initial_biomass = 1, n_years = 50, w, k) {
+  biomass <- numeric(n_years)
+  biomass[1] <- initial_biomass
+  for (t in seq_len(n_years - 1)) {
+    biomass[t + 1] <- biomass[t] + w * biomass[t] * (1 - biomass[t] / k)
+  }
+  return(biomass)
+}
+
+#run simulation for 50 years
+biomass_over_time_50 <- simulate_biomass_50_years(initial_biomass = 1, n_years = 50, w = w, k = k)
+
+#create df for CBA 
+cba_kelp_farm <- data.frame(
+  year = 0:49, #year 0 to 49 = 50 years total
+  biomass = biomass_over_time_50
+) %>%
+  mutate(
+    #benefits = carbon sequestered + carbon credit value
+    carbon_sequestered = biomass * s,
+    carbon_credit_value = carbon_sequestered * p,
+    discounted_benefits = carbon_credit_value / (1 + r)^year,
+    
+    #costs = maintenance cost starting from year 1 + initial setup cost at year 0
+    annual_cost = ifelse(year == 0, c, d), # if year is 0, use setup cost, otherwise use maintenance cost
+    discounted_costs = annual_cost / (1 + r)^year
+  )
+
+# CAT output
+# cat("Total Present Value of Benefits over 50 years:", total_discounted_benefits, "\n")
+# cat("Total Present Value of Costs over 50 years:", total_discounted_costs, "\n")
+
+
+#sum present values (discounted) of costs and benefits over 50 years
+total_discounted_benefits <- sum(cba_kelp_farm$discounted_benefits)
+total_discounted_costs <- sum(cba_kelp_farm$discounted_costs)
+
+#show results
+total_discounted_benefits
+total_discounted_costs
+
+
+```
+
+The total discounted benefits over 50 years are \$21,329.52, while the total discounted costs are \$28,169.72. This indicates that the benefits of the kelp farm **do not** outweigh the costs over the 50-year horizon.
 
 ### f)
 
 The Chinese government is considering raising the carbon price (p). What value of p would make kelp farmers exactly break even (so present value of benefits equals present value of costs)?
+
+```{r}
+
+#alter previous function to find where p makes kelp farmers break even
+
+CB_even <- function(p, w, s, r, c, d, k, n_years = 50) {
+  # Simulate biomass growth over n_years
+  simulate_biomass_50_years <- function(initial_biomass = 1, n_years = 50, w, k) {
+    biomass <- numeric(n_years)
+    biomass[1] <- initial_biomass
+    for (t in seq_len(n_years - 1)) {
+      biomass[t + 1] <- biomass[t] + w * biomass[t] * (1 - biomass[t] / k)
+    }
+    return(biomass)
+  }
+  
+  # Get biomass values over time
+  biomass_over_time_50 <- simulate_biomass_50_years(initial_biomass = 1, n_years = n_years, w = w, k = k)
+  
+  # Create a dataframe for calculating costs and benefits
+  cba_kelp_farm <- data.frame(
+    year = 0:(n_years - 1),  # year 0 to n_years-1 = 50 years total
+    biomass = biomass_over_time_50
+  ) %>%
+    mutate(
+      # Benefits
+      carbon_sequestered = biomass * s,
+      carbon_credit_value = carbon_sequestered * p,
+      discounted_benefits = carbon_credit_value / (1 + r)^year,
+      
+      # Costs
+      annual_cost = ifelse(year == 0, c, d),  # if year is 0, use setup cost, otherwise use maintenance cost
+      discounted_costs = annual_cost / (1 + r)^year
+    )
+  
+  # Calculate the sum of discounted benefits and costs
+  total_discounted_benefits <- sum(cba_kelp_farm$discounted_benefits)
+  total_discounted_costs <- sum(cba_kelp_farm$discounted_costs)
+  
+  # Return the difference between total discounted benefits and costs
+  return(total_discounted_benefits - total_discounted_costs)
+}
+
+# Use a numerical solver to find the value of p that makes the CB difference equal to zero
+#uniroot(f(The function for which we want to find the root), interval = c(a, b), tol = desired_tolerance, ...)
+
+
+# Find break-even carbon price using uniroot
+result <- uniroot(
+  f = CB_even, 
+  interval = c(0, 100),  # Search interval for p
+  w = w, s = s, r = r, c = c, d = d, k = k
+)
+
+# Output the price p that balances benefits and costs
+break_even_price <- result$root
+break_even_price
+
+
+```
 
 ## 2)
 
@@ -140,18 +294,142 @@ Now supposes that you are uncertain about the parameters w (growth rate of kelp)
 
 Write a function in R that takes any value of w, s, and p as inputs and returns the Present value of Benefits minus the present value of Costs (keeping other parameters at their values from above)
 
+HOW IS THIS DIFFERENT THAN BEFORE???
+
+```{r}
+#create function to calculate Present Value of Benefits minus Costs with correct parameters
+#fyi- this is similar to the function in question 1, but this time its written as a function that accepts parameters making it easier to run multiple scenarios
+
+CB_function <- function(w, s, p, c = 10000, d = 1000, k = 100, r = 0.05, n_years = 50) {
+  
+#simulate biomass growth over n_years using the logistic growth model
+  simulate_biomass_50_years <- function(initial_biomass = 1, n_years = 50, w, k) {
+    biomass <- numeric(n_years)
+    biomass[1] <- initial_biomass
+    for (t in seq_len(n_years - 1)) {
+      biomass[t + 1] <- biomass[t] + w * biomass[t] * (1 - biomass[t] / k)
+    }
+    return(biomass)
+  }
+  
+#get biomass values over time
+  biomass_over_time_50 <- simulate_biomass_50_years(initial_biomass = 1, n_years = n_years, w = w, k = k)
+  
+#create a dataframe for calculating costs and benefits
+  cba_kelp_farm <- data.frame(
+    year = 0:(n_years - 1),  # year 0 to n_years-1 = 50 years total
+    biomass = biomass_over_time_50
+  ) %>%
+    mutate(
+
+#benefits = carbon sequestration, carbon credits, and discounted benefits
+      carbon_sequestered = biomass * s,
+      carbon_credit_value = carbon_sequestered * p,
+      discounted_benefits = carbon_credit_value / (1 + r)^year, 
+      
+#costs = initial setup cost in year 0 and maintenance costs in subsequent years
+      annual_cost = ifelse(year == 0, c, d),  # if year is 0, use setup cost, otherwise use maintenance cost
+      discounted_costs = annual_cost / (1 + r)^year 
+    )
+  
+#calculate the total discounted benefits and total discounted costs
+  total_discounted_benefits <- sum(cba_kelp_farm$discounted_benefits)
+  total_discounted_costs <- sum(cba_kelp_farm$discounted_costs)
+  
+#return the difference: Present value of benefits minus costs
+  return(total_discounted_benefits - total_discounted_costs)
+}
+
+```
+
 ### b)
 
 Call that function for the values w = .5, s = .5, and p = 40. What is the result?
+
+```{r}
+benefits_minus_costs_results <- CB_function(w = 0.5, s = 0.5, p = 40)
+
+#show results
+benefits_minus_costs_results
+
+```
+
 
 ### c)
 
 Have R generate one value of w, s, and p from the distributions described above. Call your function for those values and show the result.
 
+```{r}
+#generate a random value for w, s, and p using the distributions described:
+w_random <- rnorm(1, mean = 0.5, sd = 0.2)  # Normal distribution for w
+s_random <- sample(c(0.4, 0.5, 0.6), 1)  #random choice from 0.4, 0.5, 0.6
+p_random <- rnorm(1, mean = 40, sd = 15)  # Normal distribution for p
+
+#call the function with randomly generated values
+random_result <- CB_function(w = w_random, s = s_random, p = p_random)
+
+#show random result
+random_result
+
+```
+
+
 ### d)
 
 Write an R program that draws 1,000 different combinations of w, s, and p from their respective distributions, and calls your function for each set of values. Plot a histogram of the final results.
 
+```{r}
+#set the seed for reproducibility
+set.seed(123)
+
+#number of simulations
+n_simulations <- 1000
+
+#generate 1000 combinations of w, s, and p
+results <- replicate(n_simulations, {
+  w_sim <- rnorm(1, mean = 0.5, sd = 0.2)
+  s_sim <- sample(c(0.4, 0.5, 0.6), 1)
+  p_sim <- rnorm(1, mean = 40, sd = 15)
+  
+  CB_function(w = w_sim, s = s_sim, p = p_sim)
+})
+
+```
+
+
+```{r}
+
+#create df for ggplot
+sim_results_df <- data.frame(Net_Present_Value = results)
+
+#histogram - make bins larger or else it looks crazy ;)
+ggplot(sim_results_df, aes(x = Net_Present_Value)) +
+  geom_histogram( bins = 30,
+                  fill = "#4C9F70",
+                  color = "black",
+                  alpha = 0.7) +
+  labs(
+    title = "Histogram of Net Present Value of Benefits - Costs", 
+    x = "Net Present Value ($)",
+    y = "Frequency") +
+  theme_minimal()
+```
+
 ### e)
 
 Using these distributions, what is the probability that the kelp farm will have positive net present value of benefits? What is the probability that the net present value of benefits will be larger than \$5,000?
+
+```{r}
+#probability of positive net present value
+positive_npv <- mean(sim_results_df$Net_Present_Value > 0)
+
+#probability of net present value larger than $5,000
+npv_above_5000 <- mean(sim_results_df$Net_Present_Value > 5000)
+
+#results
+positive_npv
+npv_above_5000
+
+```
+Probability of positive net present value: 0.2
+Probability of net present value larger than $5,000: 0.103
